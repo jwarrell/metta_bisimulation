@@ -1,0 +1,413 @@
+module metta_bisimulation where
+
+---- To run this example, first install the implementation of Guarded Cubical Type Theory from:
+----     https://github.com/hansbugge/cubicaltt/tree/gcubical
+---- and call: cubical metta_bisimulation
+
+import prelude
+import nat
+
+------------ Standard definitions
+
+data list (A : U) = nil 
+                  | cons (a : A) (as : list A)
+
+append (A : U) : list A -> list A -> list A = split
+  nil -> idfun (list A)
+  cons x xs -> \(ys : list A) -> cons x (append A xs ys)
+
+foldr (A B : U) (f : A -> B -> B) (b0 : B) : list A -> B
+    = split
+      nil -> b0
+      cons a as -> f a (foldr A B f b0 as)
+
+data bool = false | true
+
+
+------------ Keywords / expression data-types
+
+-- keywords
+data K 
+ = nl | v1 | v2 | f1 | t | s
+
+-- expressions
+data E3
+ = Cons (k1 : K) (k2 : K) (k3 : K)
+
+-- all valid expressions
+data Expr = v1 | v2 | f1 | f1_v1 | f1_v2 | f1_f1_v1 | f1_f1_v2 | t_f1_v1
+          | t_f1_v2 | t_v1 | t_v2 | s_t_v1 | s_t_v2 | t_t_v1 | t_t_v2
+
+
+------------ Helper functions
+
+-- keyword equality
+EqK (k1 : K) : K -> bool = split
+	nl -> fun1 k1
+	  where fun1 : K -> bool = split
+	    nl -> true
+	    v1 -> false
+	    v2 -> false
+	    f1 -> false
+	    t -> false
+	    s -> false
+	v1 -> fun2 k1
+	  where fun2 : K -> bool = split
+	    nl -> false
+	    v1 -> true
+	    v2 -> false
+	    f1 -> false
+	    t ->false
+	    s -> false
+	v2 -> fun3 k1
+	  where fun3 : K -> bool = split
+	    nl -> false
+	    v1 -> false
+	    v2 -> true
+	    f1 -> false
+	    t -> false
+	    s -> false
+	f1 -> fun4 k1
+	  where fun4 : K -> bool = split
+	    nl -> false
+	    v1 -> false
+	    v2 -> false
+	    f1 -> true
+	    t -> false
+	    s -> false
+	t -> fun5 k1
+	  where fun5 : K -> bool = split
+	    nl -> false
+	    v1 -> false
+	    v2 -> false
+	    f1 -> false
+	    t -> true
+	    s -> false
+	s -> fun6 k1
+	  where fun6 : K -> bool = split
+	    nl -> false
+	    v1 -> false
+	    v2 -> false
+	    f1 -> false
+	    t -> false
+	    s -> true
+	    
+m1 : Expr -> E3
+   = split
+     v1 -> Cons nl nl v1
+     v2 -> Cons nl nl v2
+     f1 -> Cons nl nl f1
+     f1_v1 -> Cons nl f1 v1
+     f1_v2 -> Cons nl f1 v2
+     f1_f1_v1 -> Cons f1 f1 v1
+     f1_f1_v2 -> Cons f1 f1 v2
+     t_f1_v1 -> Cons t f1 v1
+     t_f1_v2 -> Cons t f1 v2
+     t_v1 -> Cons nl t v1
+     t_v2 -> Cons nl t v2
+     s_t_v1 -> Cons s t v1
+     s_t_v2 -> Cons s t v2
+     t_t_v1 -> Cons t t v1
+     t_t_v2 -> Cons t t v2
+
+m2 : Expr -> list K
+   = split
+     v1 -> cons v1 nil
+     v2 -> cons v2 nil
+     f1 ->  cons f1 nil
+     f1_v1 ->  cons f1 (cons v1 nil)
+     f1_v2 ->  cons f1 (cons v2 nil)
+     f1_f1_v1 -> cons f1 (cons f1 (cons v1 nil))
+     f1_f1_v2 -> cons f1 (cons f1 (cons v2 nil))
+     t_f1_v1 ->  cons t (cons f1 (cons v1 nil))
+     t_f1_v2 ->  cons t (cons f1 (cons v2 nil))
+     t_v1 ->  cons t (cons v1 nil)
+     t_v2 ->  cons t (cons v2 nil)
+     s_t_v1 -> cons s (cons t (cons v1 nil))
+     s_t_v2 -> cons s (cons t (cons v2 nil))
+     t_t_v1 -> cons t (cons t (cons v1 nil))
+     t_t_v2 -> cons t (cons t (cons v2 nil))
+
+E3_to_list : E3 -> list K
+   = split
+     Cons k1 k2 k3 -> cons k1 (cons k2 (cons k3 nil))
+
+list_to_Expr : list K -> Expr
+    = split
+      nil -> v1
+      cons k0 k0s -> fun1 k0 k0s
+          where fun1 (k0 : K) : list K -> Expr = split
+	      nil -> fun2 k0
+	         where fun2 : K -> Expr = split
+		     nl -> v1
+		     v1 -> v1
+		     v2 -> v2
+		     f1 -> f1
+		     t -> v1
+		     s -> v1
+	      cons k1 k1s -> fun3 k0 k1 k1s
+               	    where fun3 (k0 k1 : K) : list K -> Expr = split
+	      	    	nil -> fun4 k0 k1
+	         	    where fun4 (k0 : K) : K -> Expr = split
+		     	    	nl -> v1
+		     		v1 -> fun5 k0
+				    where fun5 : K -> Expr = split
+				        nl -> v1
+					v1 -> v1
+					v2 -> v1
+					f1 -> f1_v1
+					t -> t_v1
+					s -> v1
+		     		v2 -> fun6 k0
+				    where fun6 : K -> Expr = split
+				        nl -> v1
+					v1 -> v1
+					v2 -> v1
+					f1 -> f1_v2
+					t -> t_v2
+					s -> v1
+		     		f1 -> v1
+		     		t -> v1
+		     		s -> v1
+			cons k2 k2s -> fun7 k0 k1 k2 k2s
+               	    	       where fun7 (k0 k1 k2 : K) : list K -> Expr = split
+	      	    	       	   nil -> fun8 k0 k1 k2
+	         	    	     where fun8 (k0 k1 : K) : K -> Expr = split
+		     	    	     	 nl -> v1
+		     		  	 v1 -> fun9 k0 k1
+					   where fun9 (k0 : K) : K -> Expr = split
+					       nl -> v1
+					       v1 -> v1
+					       v2 -> v1
+					       f1 -> fun10 k0
+					         where fun10 : K -> Expr = split
+						     nl -> v1
+						     v1 -> v1
+						     v2 -> v1
+						     f1 -> f1_f1_v1
+						     t -> t_f1_v1
+						     s -> v1
+					       t -> fun11 k0
+					         where fun11 : K -> Expr = split
+						     nl -> v1
+						     v1 -> v1
+						     v2 -> v1
+						     f1 -> v1
+						     t -> t_t_v1
+						     s -> s_t_v1
+					       s -> v1
+					 v2 -> fun12 k0 k1
+					     where fun12 (k0 : K) : K -> Expr = split
+					       nl -> v1
+					       v1 -> v1
+					       v2 -> v1
+					       f1 -> fun13 k0
+					         where fun13 : K -> Expr = split
+						     nl -> v1
+						     v1 -> v1
+						     v2 -> v1
+						     f1 -> f1_f1_v2
+						     t -> t_f1_v2
+						     s -> v1
+					       t -> fun14 k0
+					          where fun14 : K -> Expr = split
+						     nl -> v1
+						     v1 -> v1
+						     v2 -> v1
+						     f1 -> v1
+						     t -> t_t_v2
+						     s -> s_t_v2
+					       s -> v1
+					 f1 -> v1
+					 t -> v1
+					 s -> v2
+				   cons k3 k3s -> v1
+
+
+------------ Evaluation via MeTTa pattern matching
+
+-- rules
+data rule
+ = Cons (r1 : K) (r2 : K) (r3 : K)
+
+-- atomspace
+A : U = list rule
+
+as : A = cons (Cons s t nl) (cons (Cons f1 v1 v2) (cons (Cons f1 v2 v1) nil))
+
+-- compress
+comp_fun (k : K) (ks : list K) : (list K)
+     = fun1 ks k
+	    where fun1 (ks : list K) : (k : K) -> (list K) = split
+	        nl -> ks
+	       	v1 -> append K (cons v1 nil) ks
+		v2 -> append K (cons v2 nil) ks
+		f1 -> append K (cons f1 nil) ks
+		t -> append K (cons t nil) ks
+		s -> append K (cons s nil) ks   
+
+compress (ks_in : list K) : (list K)
+    = foldr K (list K) comp_fun nil ks_in
+
+-- Toy MeTTa evaluator
+rewrite (r1 r2 r3 : K) : (ks : list K) -> (list K)
+    = split
+      nil -> nil
+      cons k1 k1s -> fun1 k1s (EqK r1 k1)
+          where fun1 (k1s : list K) : (b1 : bool) -> list K = split
+	      false -> cons k1 (rewrite r1 r2 r3 k1s)
+	      true -> fun1a k1s
+	          where fun1a : (k1s : list K) -> (list K) = split
+		      nil -> cons k1 nil
+		      cons k2 k2s -> fun2 k2s (EqK r2 k2)
+		                where fun2 (k2s : list K) : (b2 : bool) -> list K = split
+	      			    false -> cons k1 (rewrite r1 r2 r3 k1s)
+	      			    true -> cons r3 (rewrite r1 r2 r3 k2s)
+
+upd_fun (r : rule) (ks : list K) : list K
+	    = fun1 ks r
+	        where fun1 (ks : list K) : (r : rule) -> list K = split
+		    Cons k1 k2 k3 -> rewrite k1 k2 k3 ks
+
+update (rs_in : list rule) : (ks_in : list K) -> list K = split
+    nil -> nil
+    cons k1 k1s -> fun1 rs_in (cons k1 k1s) k1
+       where fun1 (rs_in : list rule) (ks_in : list K) : K -> list K = split
+           nl ->  compress (foldr rule (list K) upd_fun ks_in rs_in)
+	   v1 ->  compress (foldr rule (list K) upd_fun ks_in rs_in)
+	   v2 ->  compress (foldr rule (list K) upd_fun ks_in rs_in)
+	   f1 ->  compress (foldr rule (list K) upd_fun ks_in rs_in)
+	   t ->  ks_in
+	   s ->  compress (foldr rule (list K) upd_fun ks_in rs_in)
+
+update' : list K -> list K
+    = update as
+
+
+------------ Evaluation via direct Beta-reduction definition
+
+-- beta reduction
+beta3 : E3 -> E3
+  = split
+    Cons k1 k2 k3 -> fun1 k3 k2 k1
+    	 where fun1 (k3 k2 : K) : K -> E3 = split
+	          nl -> fun2 k3 k2
+		      where
+			 fun2 (k3 : K) : K -> E3 = split
+	       	    	      nl -> Cons nl nl k3
+	       	    	      v1 -> Cons nl v1 k3
+			      v2 -> Cons nl v2 k3
+		    	      f1 -> fun3 k3
+		       	      	 where fun3 : K -> E3 = split
+		       	                nl -> Cons nl nl nl
+				  	v1 -> Cons nl nl v2
+				  	v2 -> Cons nl nl v1 
+					f1 -> Cons nl f1 f1
+					t -> Cons nl f1 t
+					s -> Cons nl f1 s
+			      t -> Cons nl t k3
+			      s -> Cons nl s k3
+	          v1 -> Cons v1 k2 k3 
+		  v2 -> Cons v2 k2 k3 
+		  f1 -> fun4 k3 k2
+		      where
+			 fun4 (k3 : K) : K -> E3 = split
+	       	    	      nl -> Cons f1 nl k3
+	       	    	      v1 -> Cons f1 v1 k3
+			      v2 -> Cons f1 v2 k3
+		    	      f1 -> fun5 k3
+		       	      	 where fun5 : K -> E3 = split
+		       	                nl -> Cons f1 f1 nl
+				  	v1 -> Cons nl f1 v2
+				  	v2 -> Cons nl nl v2 
+					f1 -> Cons f1 f1 f1
+					t -> Cons f1 f1 t
+					s -> Cons f1 f1 s
+			      t -> Cons nl t k3
+			      s -> Cons nl s k3		  
+		  t -> Cons t k2 k3 
+		  s -> fun6 k3 k2
+		      where
+			 fun6 (k3 : K) : K -> E3 = split
+	       	    	      nl -> Cons s nl k3
+	       	    	      v1 -> Cons s v1 k3
+			      v2 -> Cons s v2 k3
+			      f1 -> Cons s f1 k3
+		    	      t -> fun7 k3
+		       	      	 where fun7 : K -> E3 = split
+		       	                nl -> Cons s t nl
+				  	v1 -> Cons nl nl v1
+				  	v2 -> Cons nl nl v2 
+					f1 -> Cons s t f1
+					t -> Cons s t t
+					s -> Cons s t s
+			      s -> Cons s s k3
+		    
+
+------------ Proof of Bisimulation
+
+-- Guarded Streams
+data gStr (A : U) k
+  = Cons (x : A) (xs : |> k (gStr A $ k))
+
+Str (A : U) : U
+  = forall k, gStr A $ k
+
+-- Head and Tail
+ghd (A : U) k : (xs : gStr A $ k) -> A
+  = split
+      Cons x _ -> x
+
+gtl (A : U) k : (xs : gStr A $ k) -> |> k (gStr A $ k)
+  = split
+      Cons _ ys -> ys
+
+hd (A : U) (xs : Str A) : A
+  = ghd A $ k0 (xs $ k0)
+
+tl (A : U) (xs : Str A) : Str A
+  = prev k (gtl A $ k (xs $ k))
+
+-- Iteration
+iterate k (A : U) (f : A -> A) : A -> gStr A $ k
+  = fix k it (A -> gStr A $ k)
+    (\ (a : A) ->
+      Cons a (next k [it' <- it] (it' (f a))))
+
+-- Bisimulation between streams
+data Bisimilar (A : U) (xs ys : Str A) =
+  consBi (h : Id A (hd A xs) (hd A ys))
+        (t : Bisimilar A (tl A xs) (tl A ys))
+
+-- update using beta reduction
+update1 (e : Expr) :  Expr
+    =  list_to_Expr (compress (E3_to_list (beta3 (m1 e))))
+
+-- update using pattern matching
+update2  (e : Expr) :  Expr
+    =  list_to_Expr (update' (m2 e))
+
+-- generate stream from any starting expression
+str1 (e0 : Expr) : Str Expr = [ k ] iterate $k Expr update1 e0
+
+str2 (e0 : Expr) : Str Expr = [ k ] iterate $k Expr update2 e0
+
+-- proof that streams starting from same expression are bisimilar
+bisim : (e0 : Expr) -> (Bisimilar Expr (str1 e0) (str2 e0)) = split
+     v1 -> consBi (refl Expr v1) (bisim v1)
+     v2 -> consBi (refl Expr v2) (bisim v2)
+     f1 -> consBi (refl Expr f1) (bisim f1)
+     f1_v1 -> consBi (refl Expr f1_v1) (bisim v2)
+     f1_v2 ->  consBi (refl Expr f1_v2) (bisim v1)
+     f1_f1_v1 ->  consBi (refl Expr f1_f1_v1) (bisim f1_v2)
+     f1_f1_v2 -> consBi (refl Expr f1_f1_v2) (bisim v2)
+     t_f1_v1 ->  consBi (refl Expr t_f1_v1) (bisim t_f1_v1)
+     t_f1_v2 ->  consBi (refl Expr t_f1_v2) (bisim t_f1_v2)   
+     t_v1 -> consBi (refl Expr t_v1) (bisim t_v1)
+     t_v2 -> consBi (refl Expr t_v2) (bisim t_v2)
+     s_t_v1 -> consBi (refl Expr s_t_v1) (bisim v1)
+     s_t_v2 ->  consBi (refl Expr s_t_v2) (bisim v2)
+     t_t_v1 ->  consBi (refl Expr t_t_v1) (bisim t_t_v1)
+     t_t_v2 ->  consBi (refl Expr t_t_v2) (bisim t_t_v2)
+
+
